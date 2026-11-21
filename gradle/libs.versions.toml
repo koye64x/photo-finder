@@ -9,9 +9,9 @@ ktlint-gradle = "14.2.0"
 ktlint = "1.8.0"
 detekt = "2.0.0-alpha.6"
 
-android-compileSdk = "36"
+android-compileSdk = "37"
 android-minSdk = "29"
-android-targetSdk = "36"
+android-targetSdk = "37"
 jvm-target = "17"
 
 [libraries]
