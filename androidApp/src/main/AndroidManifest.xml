@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Permissions are intentionally minimal (see AGENTS.md, rule 4).
+      No READ_MEDIA_IMAGES / READ_EXTERNAL_STORAGE: photos are accessed via SAF only.
+      CAMERA and the local-network permissions for QR sharing are added with their features.
+    -->
+
+    <!-- allowBackup=false: face data must never reach cloud backups (AGENTS.md, rule 3). -->
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:label="Фото по лицу"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        tools:targetApi="31">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

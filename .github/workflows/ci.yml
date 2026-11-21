@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, tests, lint (JVM + Android)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5
+      - run: chmod +x gradlew
+      - name: Forbidden APIs and permissions
+        run: bash scripts/check-forbidden.sh
+      # ANDROID_HOME is preset on GitHub-hosted runners, so Android targets are enabled here.
+      - name: Build, test, lint
+        run: ./gradlew build --continue
+      - name: Upload reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+
+  ios:
+    name: iOS framework + tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v5
+      - run: chmod +x gradlew
+      - name: Link iOS framework and run iOS simulator tests
+        run: ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64 iosSimulatorArm64Test --continue

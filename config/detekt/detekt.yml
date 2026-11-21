@@ -1,0 +1,15 @@
+# Overrides on top of the detekt default config (buildUponDefaultConfig = true).
+# Do not relax rules to make a change pass; fix the code or justify the change in the PR.
+
+naming:
+  FunctionNaming:
+    # @Composable functions are PascalCase
+    ignoreAnnotated:
+      - Composable
+
+style:
+  MagicNumber:
+    excludes:
+      - '**/test/**'
+      - '**/*Test/**'
+      - '**/*Test.kt'

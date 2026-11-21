@@ -1,0 +1,19 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+gradlew text eol=lf
+
+# Binary assets
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.heic binary
+*.mp4 binary
+
+# ML models and test data via Git LFS
+*.onnx filter=lfs diff=lfs merge=lfs -text
+*.tflite filter=lfs diff=lfs merge=lfs -text
+testdata/** filter=lfs diff=lfs merge=lfs -text
+
+# Keep docs inside LFS-tracked folders as plain text
+testdata/**/*.md !filter !diff !merge text
+testdata/*.md !filter !diff !merge text
