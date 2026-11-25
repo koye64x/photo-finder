@@ -14,7 +14,7 @@
 
 ## Статус
 
-Каркас Kotlin Multiplatform: модули, convention-плагины, линтеры, CI. Реализованы и покрыты тестами только чистые части ядра: косинусный поиск с двумя порогами и расширением запроса, инкрементальная индексация, усреднение кадров, лимит печати. Платформенные адаптеры (CameraX, SAF, SQLCipher, ONNX Runtime, печать, Ktor) пока не написаны: в коде есть только интерфейсы и in-memory/fake-реализации. iOS-приложения (Xcode-проект `iosApp/`) ещё нет, есть только iOS-фреймворк `ComposeApp` и точка входа `MainViewController`.
+Каркас Kotlin Multiplatform: модули, convention-плагины, линтеры, CI. Реализованы и покрыты тестами чистые части ядра: косинусный поиск с двумя порогами и расширением запроса, инкрементальная индексация, усреднение кадров, лимит печати, а также ML-конвейер в `:core:ml` (EXIF-поворот, детекция YuNet, выравнивание, эмбеддинги, фильтр качества) с JVM-адаптерами ONNX Runtime и ImageIO. Тест точности написан, но эталонного набора ещё нет. Платформенные адаптеры Android/iOS (CameraX, SAF, SQLCipher, ONNX Runtime, печать, Ktor) пока не написаны: в коде есть только интерфейсы и in-memory/fake-реализации. iOS-приложения (Xcode-проект `iosApp/`) ещё нет, есть только iOS-фреймворк `ComposeApp` и точка входа `MainViewController`.
 
 ## Жёсткие правила
 
@@ -24,13 +24,14 @@
 2. **Данные только на внешнем носителе.** Фото, индекс лиц и списки печати хранятся в папке события, выбранной через SAF (`ACTION_OPEN_DOCUMENT_TREE`) / `UIDocumentPicker`. Во внутреннюю память не пишутся ни фото, ни биометрия. Без носителя приложение не работает.
 3. **Биометрия.** Индекс лиц — только в SQLCipher с ключом события из Android Keystore / Keychain. Вектор пользователя живёт только в памяти и удаляется после «Готово». «Завершить мероприятие» удаляет индекс и уничтожает ключ. `android:allowBackup="false"`. Векторы, кропы лиц и кадры камеры не пишутся в логи и на диск.
 4. **Разрешения.** Не запрашивать `READ_MEDIA_IMAGES`, `READ_EXTERNAL_STORAGE`, геолокацию, контакты. Разрешения камеры и локальной сети добавляются вместе с соответствующими функциями.
-5. **Единый ML-рантайм.** Детекция (YuNet) и эмбеддинги (AuraFace) работают на одних моделях и одном рантайме на всех платформах. Не использовать ML Kit и Apple Vision: векторы и пороги должны совпадать на всех платформах и в JVM-тестах.
+5. **Единый ML-рантайм.** Детекция (YuNet) и эмбеддинги (AuraFace или SFace, выбор по тесту точности) работают на одних моделях и одном рантайме (ONNX Runtime) на всех платформах. Не использовать ML Kit и Apple Vision: векторы и пороги должны совпадать на всех платформах и в JVM-тестах.
 6. **Логика в `commonMain`.** В `androidMain` / `iosMain` / `jvmMain` только тонкие адаптеры к системным API за интерфейсами из `commonMain`.
 
 ## Структура
 
 ```
-:core:ml           FaceEmbedding, FaceMatcher (поиск, пороги, расширение запроса), FaceDetector/FaceEmbedder
+:core:ml           FaceEmbedding, FaceMatcher (поиск, пороги, расширение запроса), FaceAnalyzer, YuNetDetector,
+                   ModelFaceEmbedder, выравнивание, EXIF; jvmMain: OrtInferenceSession, ImageIoPhotoDecoder
 :core:storage      EventStorage, PhotoId, PhotoRef — папка события на носителе
 :core:camera       FrameSource, CameraFrame, ListFrameSource (fake)
 :core:db           FaceIndex, IndexedFace, InMemoryFaceIndex (до SQLCipher)
@@ -43,7 +44,8 @@
 :desktopApp        JVM-оболочка для запуска UI на Windows без эмулятора
 build-logic/       convention-плагины: вся Gradle-конфигурация здесь
 config/detekt/     конфиг detekt
-models/, testdata/ ML-модели и эталонный набор (Git LFS), см. README в каждой папке
+models/            ML-модели (Git LFS), см. models/README.md
+testdata/          эталонный набор: клон приватного репозитория, в .gitignore, см. docs/testdata.md
 ```
 
 Пакеты: `app.photofinder.<module>` (например, `app.photofinder.core.ml`). Таргеты KMP-модулей: `jvm`, `android` (при наличии SDK), `iosArm64`, `iosSimulatorArm64`.
@@ -71,7 +73,7 @@ models/, testdata/ ML-модели и эталонный набор (Git LFS), �
 
 ## Команды
 
-Окружение: Windows 11, JDK 21, Gradle 9.9 через wrapper. В Git Bash используй `./gradlew`, в PowerShell — `.\gradlew.bat`.
+Окружение: Windows 11, Eclipse Temurin 21 (см. «JDK» ниже), Gradle 9.9 через wrapper. В Git Bash используй `./gradlew`, в PowerShell — `.\gradlew.bat`.
 
 ```bash
 ./gradlew jvmTest                       # юнит-тесты всех модулей на JVM: основной цикл проверки
@@ -86,13 +88,15 @@ bash scripts/check-forbidden.sh         # проверка запрещённы�
 
 **Android SDK.** Без SDK (нет `ANDROID_HOME` / `sdk.dir` в `local.properties`) сборка выводит предупреждение, отключает Android-таргеты и не подключает `:androidApp`. JVM-часть при этом собирается и тестируется. Android-сборку проверяет CI. Если меняешь Android-код без локального SDK, прямо скажи, что он не проверен.
 
+**JDK.** Gradle-демон и тесты запускаются на Eclipse Temurin 21: это задано в `gradle/gradle-daemon-jvm.properties`, Gradle находит JDK сам (в том числе в `~/.jdks`). Причина: ONNX Runtime требует `msvcp140.dll` версии 14.40 и выше, а Oracle JDK 17/21 кладут в `bin` свою версию 14.36, и JVM падает с `EXCEPTION_ACCESS_VIOLATION` в `msvcp140.dll` (тесты `OnnxModelsTest`, `AccuracyTest`). В Temurin 21.0.13 — версия 14.40. Если Gradle пишет, что не нашёл подходящий JDK, установи Temurin 21 (например, zip в `~/.jdks`). На Linux и macOS (CI) проблемы с DLL нет.
+
 **iOS** на Windows не собирается: iOS-таргеты пропускаются. Фреймворк и iOS-тесты собирает CI на macOS. Изменения в `iosMain` держи минимальными и симметричными Android-адаптеру.
 
 ## Как проверять изменения
 
 - Перед сдачей работы: `./gradlew build` (или хотя бы `jvmTest ktlintCheck detekt`) и `scripts/check-forbidden.sh`. Не сдавай работу с красными тестами и не отключай тесты, чтобы они стали зелёными.
 - Новая логика — с тестами в `commonTest` (`kotlin.test`, `kotlinx-coroutines-test` / `runTest`).
-- **Изменения ML-кода** (`:core:ml`, пороги, пре-/постобработка) принимаются только по тесту точности на эталонном наборе (`testdata/`): recall/precision не ниже зафиксированных порогов. В PR укажи значения до и после. Тест точности появится вместе с первой реальной моделью.
+- **Изменения ML-кода** (`:core:ml`, пороги, пре-/постобработка) принимаются только по тесту точности (`AccuracyTest`) на эталонном наборе (`testdata/`, см. `docs/testdata.md`): recall/precision не ниже зафиксированных порогов. В PR укажи значения до и после и версию набора из отчёта.
 - Логику сессии тестируй через `ListFrameSource` или видео-источник, а не через реальную камеру.
 - UI проверяй запуском `:desktopApp:run`. Скриншот-тестов пока нет.
 
@@ -101,7 +105,7 @@ bash scripts/check-forbidden.sh         # проверка запрещённы�
 - Маленькие изменения: одна задача — один модуль, если возможно. Параллельные агенты работают в отдельных git worktree.
 - Версии библиотек — только в `gradle/libs.versions.toml`. Не обновляй версии попутно; обновление — отдельная задача.
 - Новые зависимости добавляй, только если это необходимо, и проверь их на правило 1 (нет сети, нет телеметрии).
-- Модели (`.onnx`/`.tflite`) и эталонные данные не генерируются кодом и не скачиваются при сборке: они лежат в `models/` и `testdata/` (Git LFS) с указанием источника и лицензии.
+- Модели (`.onnx`/`.tflite`) и эталонные данные не генерируются кодом и не скачиваются при сборке. Модели лежат в `models/` (Git LFS) с указанием источника и лицензии. Эталонный набор — биометрия реальных людей — лежит только в приватном репозитории `photo-finder-testdata`, локально клонируется в `testdata/` (в `.gitignore`); в основной, публичный репозиторий фото людей не коммитить (см. `docs/testdata.md`).
 - В эталонном наборе — только лица с явным разрешением или синтетические.
 - Коммиты: в повелительном наклонении, по-английски, кратко (`Add cosine search with two thresholds`). Не коммить, пока об этом не попросили.
 

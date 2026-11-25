@@ -37,3 +37,10 @@ keystore.properties
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Reference set: clone of the private repo koye64x/photo-finder-testdata (biometric data, see docs/testdata.md).
+# Never commit it to this public repository.
+/testdata/
+
+# AuraFace (249 MB) is kept locally until the embedding model is chosen (models/README.md).
+/models/auraface_v1_glintr100.onnx

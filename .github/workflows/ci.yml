@@ -13,10 +13,39 @@ jobs:
   build:
     name: Build, tests, lint (JVM + Android)
     runs-on: ubuntu-latest
+    env:
+      # Read-only deploy key of the private reference set repo (docs/testdata.md). Secrets are not passed to PRs from
+      # forks: there the reference set is not checked out and AccuracyTest is skipped.
+      HAS_TESTDATA: ${{ secrets.TESTDATA_DEPLOY_KEY != '' }}
     steps:
       - uses: actions/checkout@v5
+      # Models and test data are in Git LFS (hundreds of MB). Cache them so each run does not use LFS bandwidth.
+      - name: List LFS objects
+        run: git lfs ls-files --long | cut -d ' ' -f1 | sort > .lfs-assets-id
+      - uses: actions/cache@v5
         with:
-          lfs: true
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+      - name: Fetch LFS objects
+        run: git lfs pull
+      - name: Check out reference set
+        if: env.HAS_TESTDATA == 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: koye64x/photo-finder-testdata
+          path: testdata
+          ssh-key: ${{ secrets.TESTDATA_DEPLOY_KEY }}
+      - name: List reference set LFS objects
+        if: env.HAS_TESTDATA == 'true'
+        run: git -C testdata lfs ls-files --long | cut -d ' ' -f1 | sort > .lfs-testdata-id
+      - uses: actions/cache@v5
+        if: env.HAS_TESTDATA == 'true'
+        with:
+          path: testdata/.git/lfs
+          key: lfs-testdata-${{ hashFiles('.lfs-testdata-id') }}
+      - name: Fetch reference set LFS objects
+        if: env.HAS_TESTDATA == 'true'
+        run: git -C testdata lfs pull
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -30,6 +59,13 @@ jobs:
         run: ./gradlew build --continue
       - name: Forbidden permissions in merged Android manifests
         run: bash scripts/check-forbidden.sh --merged
+      - name: Upload accuracy report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: accuracy
+          path: feature/session/build/reports/accuracy/
+          if-no-files-found: ignore
       - name: Upload reports
         if: failure()
         uses: actions/upload-artifact@v5
@@ -43,9 +79,8 @@ jobs:
     name: iOS framework + tests
     runs-on: macos-latest
     steps:
+      # No LFS: iOS tests run commonTest only and do not need models or test data.
       - uses: actions/checkout@v5
-        with:
-          lfs: true
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
