@@ -8,6 +8,7 @@
 
 - Продукт и требования: [docs/product-vision.md](docs/product-vision.md)
 - Архитектура, стек, конвейеры, хранение: [docs/technical-design.md](docs/technical-design.md)
+- Этапы разработки и порядок задач: [docs/roadmap.md](docs/roadmap.md)
 
 Прочитай оба документа перед первой задачей. Если код расходится с документами, сообщи об этом и не меняй документы молча.
 
