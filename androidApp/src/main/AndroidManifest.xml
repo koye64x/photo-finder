@@ -8,9 +8,14 @@
       CAMERA and the local-network permissions for QR sharing are added with their features.
     -->
 
-    <!-- allowBackup=false: face data must never reach cloud backups (AGENTS.md, rule 3). -->
+    <!--
+      Face data must never leave the device through backups (AGENTS.md, rule 3):
+      allowBackup/fullBackupContent cover Android 11 and lower,
+      dataExtractionRules covers cloud backup and device-to-device transfer on Android 12+.
+    -->
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:label="Фото по лицу"
         android:supportsRtl="true"

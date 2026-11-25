@@ -28,6 +28,8 @@ jobs:
       # ANDROID_HOME is preset on GitHub-hosted runners, so Android targets are enabled here.
       - name: Build, test, lint
         run: ./gradlew build --continue
+      - name: Forbidden permissions in merged Android manifests
+        run: bash scripts/check-forbidden.sh --merged
       - name: Upload reports
         if: failure()
         uses: actions/upload-artifact@v5
