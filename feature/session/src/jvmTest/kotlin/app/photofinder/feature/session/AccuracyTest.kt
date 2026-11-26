@@ -102,7 +102,7 @@ class AccuracyTest {
     }
 }
 
-/** testdata/: event photos, selfie queries per person and labels "photo,person". */
+/** testdata/: event-photos/, guest-camera/<person>/ captures and labels "photo,person". */
 private class ReferenceSet(
     val photos: List<File>,
     val queries: Map<String, List<File>>,
@@ -124,10 +124,10 @@ private class ReferenceSet(
         private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png")
 
         fun load(dir: File): ReferenceSet {
-            val photos = dir.resolve("event").images()
+            val photos = dir.resolve("event-photos").images()
             val queries =
                 dir
-                    .resolve("queries")
+                    .resolve("guest-camera")
                     .listFiles { f -> f.isDirectory }
                     .orEmpty()
                     .associate { it.name to it.images() }
@@ -141,7 +141,7 @@ private class ReferenceSet(
                     .map { line -> line.split(',').map { it.trim() } }
                     .groupBy({ it[1] }, { it[0] })
                     .mapValues { it.value.toSet() }
-            check(photos.isNotEmpty()) { "testdata/event has no photos" }
+            check(photos.isNotEmpty()) { "testdata/event-photos has no photos" }
             check(photos.none { it.isLfsPointer() }) { "testdata photos are LFS pointers; run git lfs pull" }
             return ReferenceSet(photos, queries, expected, versionOf(dir))
         }
